@@ -143,7 +143,13 @@ final class CaptchaCreateCommand extends AbstractCommand
         if ($code === 'random') {
             return null;
         }
-        $hex = str_split($code, (int)(strlen($code) / 3));
+        $short = strlen($code) === 3;
+        if ($short) {
+            $tmp = str_split($code);
+            $hex = [str_repeat($tmp[0], 2), str_repeat($tmp[1], 2), str_repeat($tmp[2], 2)];
+        } else {
+            $hex = str_split($code, 2);
+        }
         return [(int)hexdec($hex[0]), (int)hexdec($hex[1]), (int)hexdec($hex[2])];
     }
 }
