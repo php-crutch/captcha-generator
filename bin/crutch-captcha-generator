@@ -1,0 +1,217 @@
+#!/usr/bin/env php
+<?php
+
+use Crutch\CaptchaGenerator\Command\AbstractCommand;
+use Crutch\CaptchaGenerator\Command\CaptchaCreateCommand;
+use Crutch\CaptchaGenerator\Command\FontConvertCommand;
+
+spl_autoload_register(function (string $className) {
+    $pattern = '#^Crutch\\\\CaptchaGenerator\\\\#u';
+    $file = str_replace('\\', DIRECTORY_SEPARATOR, preg_replace($pattern, '', $className)) . '.php';
+    $dirs = [
+        implode(DIRECTORY_SEPARATOR, [dirname(__DIR__), 'src']),
+        implode(DIRECTORY_SEPARATOR, [dirname(__DIR__), 'crutch', 'captcha-generator', 'src']),
+    ];
+    foreach ($dirs as $dir) {
+        $path = $dir . DIRECTORY_SEPARATOR . $file;
+        if (!file_exists($path)) {
+            continue;
+        }
+        require_once $path;
+        return;
+    }
+});
+
+$commands = [
+    FontConvertCommand::getName() => FontConvertCommand::class,
+    CaptchaCreateCommand::getName() => CaptchaCreateCommand::class,
+];
+
+$command = $argv[1] ?? null;
+
+$isHelp = false;
+foreach ($argv as $value) {
+    if ($value === '--help') {
+        $isHelp = true;
+    }
+}
+
+if (is_null($command)) {
+    help($commands, $isHelp ? 0 : 1);
+}
+
+if (!array_key_exists($command, $commands)) {
+    help($commands, 1);
+}
+
+if ($isHelp) {
+    help($commands, 0, $command);
+}
+
+/** @var AbstractCommand $commandClass */
+$commandClass = $commands[$command];
+
+$arguments = array_fill_keys(array_keys($commandClass::getArguments()), null);
+$flags = array_fill_keys(array_keys($commandClass::getFlags()), false);
+$options = array_fill_keys(array_keys($commandClass::getOptions()), null);
+
+$input = array_slice($argv, 2);
+$sequence = array_keys($arguments);
+
+// parse options
+foreach ($input as $k => $value) {
+    if (substr($value, 0, 2) === '--') {
+        $name = substr($value, 2);
+        if (!array_key_exists($name, $options)) {
+            continue;
+        }
+        $next = $k + 1;
+        $v = '';
+        unset($input[$k]);
+        if (array_key_exists($next, $input)) {
+            $v = $input[$next];
+            unset($input[$next]);
+        }
+        $options[$name] = $v;
+
+    }
+}
+$input = array_values($input);
+
+// parse flags
+foreach ($input as $k => $value) {
+    if (substr($value, 0, 2) === '--') {
+        $name = substr($value, 2);
+        if (array_key_exists($name, $flags)) {
+            $flags[$name] = true;
+        }
+        unset($input[$k]);
+    }
+}
+$input = array_values($input);
+
+// parse arguments
+foreach ($input as $k => $value) {
+    if (empty($sequence)) {
+        continue;
+    }
+    $argument = array_shift($sequence);
+    $arguments[$argument] = $value;
+    unset($input[$k]);
+}
+
+$bin = new $commandClass();
+try {
+    $code = $bin->execute($arguments, $options, $flags);
+    exit($code);
+} catch (Throwable $exception) {
+    echo sprintf('Error: %s%s%s', $exception->getMessage(), PHP_EOL, PHP_EOL);
+    help($commands, $exception->getCode() ?? 127, $command);
+}
+
+function help(array $commands, int $exitCode, ?string $command = null): void
+{
+    $help = is_null($command) ? getMainHelpLines($commands) : getCommandHelpLines($commands[$command]);
+    echo implode(PHP_EOL, $help);
+    exit($exitCode);
+}
+
+function getMainHelpLines(array $commands): array
+{
+    $help = [
+        pathinfo(__FILE__, PATHINFO_FILENAME),
+        sprintf('Usage: %s %s command [--help]', PHP_BINARY, __FILE__),
+        '',
+        'Commands:',
+    ];
+    $pad = 4;
+    foreach (array_keys($commands) as $name) {
+        $len = mb_strlen($name);
+        if ($len > $pad) {
+            $pad = $len;
+        }
+    }
+    foreach ($commands as $name => $commandClass) {
+        if (!is_a($commandClass, AbstractCommand::class, true)) {
+            continue;
+        }
+        $help[] = sprintf('  %s %s', str_pad($name, $pad), $commandClass::getDescription());
+    }
+    $help[] = '';
+    $help[] = 'Options:';
+    $help[] = sprintf('  %s %s', str_pad('--help', $pad), 'show help');
+    $help[] = '';
+    return $help;
+}
+
+function getCommandHelpLines(string $commandClass): array
+{
+    if (!is_a($commandClass, AbstractCommand::class, true)) {
+        exit(127);
+    }
+    $command = $commandClass::getName();
+    $arguments = $commandClass::getArguments();
+    $flags = $commandClass::getFlags();
+    $options = $commandClass::getOptions();
+    if (!array_key_exists('help', $flags)) {
+        $flags['help'] = 'show command help';
+    }
+    $argumentsHelp = empty($arguments) ? '' : sprintf(' %s', implode(' ', array_keys($arguments)));
+    $optionsHelp = empty($options) ? '' : sprintf(' [--%s value]', implode(' value] [--', array_keys($options)));
+    $flagsHelp = empty($flags) ? '' : sprintf(' [--%s]', implode('] [--', array_keys($flags)));
+
+    $help = [
+        sprintf('%s %s', pathinfo(__FILE__, PATHINFO_FILENAME), $command),
+        $commandClass::getDescription(),
+        '',
+        sprintf('Usage: %s %s %s%s%s%s', PHP_BINARY, __FILE__, $command, $argumentsHelp, $optionsHelp, $flagsHelp),
+    ];
+    $pad = 4;
+    if (!empty($arguments)) {
+        foreach (array_keys($arguments) as $name) {
+            $len = mb_strlen($name);
+            if ($len > $pad) {
+                $pad = $len;
+            }
+        }
+    }
+    if (!empty($options)) {
+        foreach (array_keys($options) as $name) {
+            $len = mb_strlen($name);
+            if ($len > $pad) {
+                $pad = $len;
+            }
+        }
+    }
+    if (!empty($flags)) {
+        foreach (array_keys($flags) as $name) {
+            $len = mb_strlen($name);
+            if ($len > $pad) {
+                $pad = $len;
+            }
+        }
+    }
+    if (!empty($arguments)) {
+        $help[] = '';
+        $help[] = 'Arguments:';
+        foreach ($arguments as $name => $description) {
+            $help[] = sprintf('  %s %s', str_pad($name, $pad + 2), $description);
+        }
+    }
+    if (!empty($options)) {
+        $help[] = '';
+        $help[] = 'Options:';
+        foreach ($options as $name => $description) {
+            $help[] = sprintf('  --%s %s', str_pad($name, $pad), $description);
+        }
+    }
+    if (!empty($flags)) {
+        $help[] = '';
+        $help[] = 'Flags:';
+        foreach ($flags as $name => $description) {
+            $help[] = sprintf('  --%s %s', str_pad($name, $pad), $description);
+        }
+    }
+    $help[] = '';
+    return $help;
+}

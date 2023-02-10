@@ -1,0 +1,33 @@
+{
+  "name": "crutch/captcha-generator",
+  "description": "The PHP GD captcha generator",
+  "type": "library",
+  "keywords": [
+    "captcha"
+  ],
+  "license": "MIT",
+  "require": {
+    "php": "^7.4 || ^8.0",
+    "ext-gd": "*",
+    "ext-mbstring": "*"
+  },
+  "bin": [
+    "bin/crutch-captcha-generator"
+  ],
+  "autoload": {
+    "psr-4": {
+      "Crutch\\CaptchaGenerator\\": "src/"
+    }
+  },
+  "homepage": "https://github.com/php-crutch/captcha-generator",
+  "authors": [
+    {
+      "name": "Ivan Dudarev",
+      "email": "ivan@ddrv.ru",
+      "role": "developer"
+    }
+  ],
+  "support": {
+    "issues": "https://github.com/php-crutch/captcha-generator/issues"
+  }
+}
