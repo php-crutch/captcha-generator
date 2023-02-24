@@ -8,6 +8,11 @@ use Crutch\CaptchaGenerator\Exception\UnsupportedCharacters;
 
 final class CaptchaGenerator
 {
+    private const TYPE_PNG = 'png';
+    private const TYPE_JPG = 'jpg';
+    private const TYPE_GIF = 'gif';
+    private const TYPE_WEBP = 'webp';
+
     private array $alphabet;
     private int $fluctuationAmplitude = 8;
     private ?string $credits = null;
@@ -22,6 +27,8 @@ final class CaptchaGenerator
     private bool $isUseSpaces = false;
     private int $width = 160;
     private int $height = 80;
+    private string $type = self::TYPE_PNG;
+    private int $quality = 1;
 
     public function __construct()
     {
@@ -111,6 +118,38 @@ final class CaptchaGenerator
         return $that;
     }
 
+    public function asPng(int $quality = 9): self
+    {
+        $that = clone $this;
+        $that->type = self::TYPE_PNG;
+        $that->quality = min(9, max(1, $quality));
+        return $that;
+    }
+
+    public function asJpeg(int $quality = 100): self
+    {
+        $that = clone $this;
+        $that->type = self::TYPE_JPG;
+        $that->quality = min(100, max(1, $quality));
+        return $that;
+    }
+
+    public function asGif(): self
+    {
+        $that = clone $this;
+        $that->type = self::TYPE_GIF;
+        $that->quality = 0;
+        return $that;
+    }
+
+    public function asWebp(int $quality = 100): self
+    {
+        $that = clone $this;
+        $that->type = self::TYPE_WEBP;
+        $that->quality = min(100, max(1, $quality));
+        return $that;
+    }
+
     public function generate(string $text): string
     {
         $text = mb_strtolower($text);
@@ -132,7 +171,19 @@ final class CaptchaGenerator
         $this->drawCredits($captchaImage, $foreground, $background);
 
         ob_start();
-        imagepng($captchaImage, null, 9);
+        switch ($this->type) {
+            case self::TYPE_GIF:
+                imagegif($captchaImage);
+                break;
+            case self::TYPE_WEBP:
+                imagewebp($captchaImage, null, $this->quality);
+                break;
+            case self::TYPE_JPG:
+                imagejpeg($captchaImage, null, $this->quality);
+                break;
+            default:
+                imagepng($captchaImage, null, 9 - $this->quality);
+        }
         $blob = ob_get_clean();
         imagedestroy($textImage);
         imagedestroy($captchaImage);

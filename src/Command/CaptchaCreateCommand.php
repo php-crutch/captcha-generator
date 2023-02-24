@@ -23,7 +23,7 @@ final class CaptchaCreateCommand extends AbstractCommand
     {
         return [
             'text' => 'text of captcha',
-            'file' => 'path to output png file',
+            'file' => 'path to output file',
         ];
     }
 
@@ -37,6 +37,11 @@ final class CaptchaCreateCommand extends AbstractCommand
             'fluctuation-amplitude' => 'vertical fluctuation amplitude. By default, 8',
             'white-noise-density' => 'white noise density, float between 0 and 1. By default, .16',
             'black-noise-density' => 'black noise density, float between 0 and 1. By default, .03',
+            'type' => 'type png|jpeg|gif|webp. By defaults, png',
+            'quality' => implode('', [
+                'image quality, integer between 0 and 9 for png, between 0 and 100 for jpeg and webp. ',
+                'By defaults, 6 for png, 70 for jpeg and webp, ignored for gif',
+            ]),
         ];
     }
 
@@ -105,6 +110,14 @@ final class CaptchaCreateCommand extends AbstractCommand
         $backgroundColor = $this->parseColor($options['background-color'] ?? 'random', 'background-color');
         $foregroundColor = $this->parseColor($options['foreground-color'] ?? 'random', 'foreground-color');
 
+        preg_match('#^(?<type>(png|jpg|jpeg|gif|webp))$#ui', $options['type'] ?? 'png', $matches);
+        $type = strtolower($matches['type'] ?? 'png');
+        preg_match('#^(?<quality>([1-9]\d*))$#ui', $options['quality'] ?? '', $matches);
+        $quality = $matches['quality'] ?? null;
+        if (!is_null($quality)) {
+            $quality = (int)$quality;
+        }
+
         $withSpaces = $flags['with-spaces'] ?? false;
 
         $generator = (new CaptchaGenerator())
@@ -115,6 +128,20 @@ final class CaptchaCreateCommand extends AbstractCommand
             ->withBlackNoiseDensity((float)$blackNoise)
             ->withSpaces((bool)$withSpaces)
         ;
+        switch ($type) {
+            case 'gif':
+                $generator = $generator->asGif();
+                break;
+            case 'webp':
+                $generator = $generator->asWebp(is_null($quality) ? 70 : $quality);
+                break;
+            case 'jpg': // no break
+            case 'jpeg':
+                $generator = $generator->asJpeg(is_null($quality) ? 70 : $quality);
+                break;
+            default:
+                $generator = $generator->asPng(is_null($quality) ? 6 : $quality);
+        }
         if (!is_null($backgroundColor)) {
             $generator = $generator->withBackgroundColor(...$backgroundColor);
         }

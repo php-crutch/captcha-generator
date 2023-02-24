@@ -30,17 +30,19 @@ $generator = (new CaptchaGenerator())
     ->withFluctuationAmplitude(0) // Vertical fluctuation amplitude. By default, 8
     ->withWhiteNoiseDensity(.1) // White noise density. By default, 1 / 6
     ->withBlackNoiseDensity(.05) // White noise density. By default, 1 / 30
+    ->asJpeg(90) // Use JPEG format with quality from 1 to 100
+    ->asWebp(80) // Use WEBP format with quality from 1 to 100
+    ->asGif() // Use GIF format
+    ->asPng(8) // Use PNG format with quality from 1 to 9
 ;
 
 //
-$symbols = '23456789abcdegikpqsvxyz'; // alphabet without similar symbols (o=0, 1=l, i=j, t=f)
-$length = 6;
-do {
-    $text = '';
-    for ($i = 0; $i < $length; $i++) {
-        $text .= substr($symbols, mt_rand(0, strlen($symbols) - 1), 1);
-    }
-} while(!preg_match('/cp|cb|ck|c6|c9|rn|rm|mm|co|do|cl|db|qp|qb|dp|ww/', $symbols));
+$symbols = '23456789abcdegkpqsvxyz'; // alphabet without similar symbols (o=0, 1=l, i=j, t=f)
+
+$text = '';
+for ($i = 0; $i < 6; $i++) {
+    $text .= substr($symbols, mt_rand(0, strlen($symbols) - 1), 1);
+}
 
 $image = $generator->generate($text); // generate PNG image
 
